@@ -112,29 +112,31 @@ class Tor:
                 continue
         return None
 
+    def _tor_reachable(self) -> bool:
+        """Return True if the local Tor SOCKS5 proxy is accepting connections."""
+        try:
+            s = socket.create_connection((self.addr, int(self.port)), timeout=3)
+            s.close()
+            return True
+        except OSError:
+            return False
+
     def new_session(self) -> requests.Session | None:
         """
-        Restart Tor and return a session with a fresh, previously unseen exit node.
+        Send NEWNYM to rotate the Tor circuit and return a new session.
+        Skips the slow external IP-check; just verifies the SOCKS5 port is up.
         Retries up to 5 times before giving up.
         """
         max_retries = 5
         for attempt in range(1, max_retries + 1):
-            self.restart_tor()
-            time.sleep(2)  # Give Tor time to build new circuits
+            self.restart_tor()          # sends NEWNYM via control port
+            time.sleep(1)              # brief pause for circuit to stabilise
 
-            session = self.get_tor_session()
-            current_ip = self.get_current_ip(session)
+            if self._tor_reachable():
+                print(f'{color.BLUE}[!]{color.END} Tor circuit ready (attempt {attempt})')
+                return self.get_tor_session()
 
-            if current_ip is None:
-                print(f'{color.YELLOW}[!]{color.END} Could not verify Tor IP (attempt {attempt}/{max_retries}). Retrying...')
-                continue
+            print(f'{color.YELLOW}[!]{color.END} Tor SOCKS5 not reachable yet (attempt {attempt}/{max_retries}). Retrying...')
 
-            if current_ip not in self.used_proxies:
-                print(f'{color.BLUE}[!]{color.END} New Tor exit node: {color.GREEN}{current_ip}{color.END}')
-                self.used_proxies.append(current_ip)
-                return session
-            else:
-                print(f'{color.YELLOW}[!]{color.END} Duplicate exit node {current_ip}, rotating... (attempt {attempt}/{max_retries})')
-
-        print(f'{color.RED}[!]{color.END} Could not obtain a unique Tor exit node after {max_retries} attempts.')
+        print(f'{color.RED}[!]{color.END} Could not reach Tor SOCKS5 proxy after {max_retries} attempts.')
         return None

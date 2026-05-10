@@ -97,30 +97,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const startLogStream = () => {
         if (eventSource) eventSource.close();
         
-        let url = '/api/attack/logs';
-        // Note: EventSource doesn't support custom headers easily in browser,
-        // so if API_KEY is strictly enforced, SSE might fail unless passed as query param.
-        // For now, assume it works or is behind local network.
-        
-        eventSource = new EventSource(url);
+        eventSource = new EventSource('/api/attack/logs');
         
         eventSource.onmessage = (e) => {
-            if (e.data === "attack finished") {
-                setRunningState(false);
-                appendLog("Attack completed.", "log-info");
-                checkTorStatus();
-                return;
-            }
-            
             let type = '';
             if (e.data.includes('[!]')) type = 'log-error';
             if (e.data.includes('[*]')) type = 'log-info';
             appendLog(e.data, type);
         };
 
-        eventSource.onerror = () => {
+        // Named 'done' event sent by server when attack finishes
+        eventSource.addEventListener('done', (e) => {
+            setRunningState(false);
+            appendLog('Attack completed.', 'log-info');
+            checkTorStatus();
             eventSource.close();
             eventSource = null;
+        });
+
+        eventSource.onerror = () => {
+            // If attack is no longer running, clean up; otherwise keep retrying
+            if (!btnStop.disabled) {
+                eventSource.close();
+                eventSource = null;
+            }
         };
     };
 
@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         consoleOutput.innerHTML = '';
         appendLog('Initializing attack...', 'log-info');
+        btnStart.disabled = true;
 
         try {
             const res = await fetch('/api/attack/start', {
@@ -147,13 +148,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await res.json();
             if (res.ok) {
-                syncStatus();
+                // Open log stream immediately — don't wait for status poll
+                startLogStream();
+                // Poll status to update UI (running state, timestamps)
+                let polls = 0;
+                const pollUntilRunning = setInterval(async () => {
+                    await syncStatus();
+                    polls++;
+                    if (polls > 10) clearInterval(pollUntilRunning);
+                }, 1000);
                 checkTorStatus();
             } else {
                 appendLog(`Error: ${data.error}`, 'log-error');
+                btnStart.disabled = false;
             }
         } catch (err) {
             appendLog(`Request failed: ${err.message}`, 'log-error');
+            btnStart.disabled = false;
         }
     });
 
