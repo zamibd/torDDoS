@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/extractors"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/keyauth"
 	"github.com/gofiber/fiber/v3/middleware/logger"
@@ -52,20 +53,12 @@ func main() {
 	apiKey := os.Getenv("API_KEY")
 	if apiKey != "" {
 		api.Use(keyauth.New(keyauth.Config{
-			// Extract key from header OR query param (needed for EventSource / SSE
-			// because browsers cannot set custom headers on EventSource connections).
-			Extractor: func(c fiber.Ctx) (string, error) {
-				// 1. Try X-API-Key header (normal REST calls)
-				if key := c.Get("X-API-Key"); key != "" {
-					return key, nil
-				}
-				// 2. Fall back to ?token= query param (EventSource / SSE)
-				if key := c.Query("token"); key != "" {
-					return key, nil
-				}
-				// Return empty string — keyauth will reject with 401
-				return "", keyauth.ErrMissingOrMalformedAPIKey
-			},
+			// Chain: try X-API-Key header first (REST calls), then ?token= query param
+			// (fallback for EventSource/SSE — browsers cannot set custom headers on SSE).
+			Extractor: extractors.Chain(
+				extractors.FromHeader("X-API-Key"),
+				extractors.FromQuery("token"),
+			),
 			Validator: func(c fiber.Ctx, key string) (bool, error) {
 				return key == apiKey, nil
 			},
