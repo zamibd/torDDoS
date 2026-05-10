@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-venv \
     procps \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 RUN echo "ControlPort 9051\nCookieAuthentication 0" >> /etc/tor/torrc
@@ -55,7 +56,19 @@ ENV TORDDOS_DIR=/app
 ENV PORT=8080
 
 RUN echo '#!/bin/sh\n\
-pkill -x tor || true\n\
+set -e\n\
+echo "[entrypoint] Starting Tor daemon..."\n\
+/etc/init.d/tor start || tor --defaults-torrc /usr/share/tor/tor-service-defaults-torrc -f /etc/tor/torrc --RunAsDaemon 1\n\
+echo "[entrypoint] Waiting for Tor SOCKS5 port (9050)..."\n\
+for i in $(seq 1 30); do\n\
+    nc -z 127.0.0.1 9050 2>/dev/null \&\& break\n\
+    echo "[entrypoint] Waiting... ($i/30)"\n\
+    sleep 1\n\
+done\n\
+if ! nc -z 127.0.0.1 9050 2>/dev/null; then\n\
+    echo "[entrypoint] WARNING: Tor SOCKS5 not ready after 30s, starting API anyway"\n\
+fi\n\
+echo "[entrypoint] Starting torDDoS API..."\n\
 exec torddos-api' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
