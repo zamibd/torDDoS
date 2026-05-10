@@ -122,14 +122,14 @@ func StartAttack(c fiber.Ctx) error {
 
 // StopAttack godoc
 // POST /api/attack/stop
+// Idempotent: always returns 200 so the UI can safely reset state.
 func StopAttack(c fiber.Ctx) error {
 	if !state.Global.IsRunning() {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "no attack is currently running",
-		})
+		// Nothing running — acknowledge gracefully so the client can reset its UI
+		return c.JSON(fiber.Map{"message": "no attack running", "already_stopped": true})
 	}
 	state.Global.Stop()
-	return c.JSON(fiber.Map{"message": "attack stopped"})
+	return c.JSON(fiber.Map{"message": "attack stopped", "already_stopped": false})
 }
 
 // GetStatus godoc

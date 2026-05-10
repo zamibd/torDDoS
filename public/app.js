@@ -175,12 +175,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: getHeaders()
             });
+            const data = await res.json();
             if (res.ok) {
-                appendLog('Sent stop signal...', 'text-muted');
-                setTimeout(syncStatus, 1000);
+                const msg = data.already_stopped
+                    ? 'Attack had already stopped.'
+                    : 'Stop signal sent.';
+                appendLog(msg, 'log-info');
+                // Always reset UI — attack may have finished before stop was clicked
+                setRunningState(false);
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+            } else {
+                appendLog(`Stop failed: ${data.error || res.status}`, 'log-error');
             }
         } catch (err) {
-            console.error(err);
+            appendLog(`Stop request failed: ${err.message}`, 'log-error');
         }
     });
 
