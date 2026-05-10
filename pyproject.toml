@@ -1,0 +1,30 @@
+[project]
+name = "torddos"
+version = "2.0.0"
+description = "TorDDoS - Route stress-test traffic through the Tor network"
+requires-python = ">=3.8"
+dependencies = [
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "PySocks>=1.7.1",
+    "urllib3>=2.0.0",
+]
+
+[tool.pyrefly]
+# Tell Pyrefly the project root so it can resolve `lib.*` imports
+project_root = "."
+search_path = ["."]
+python_version = "3.12"
+
+[tool.pyright]
+pythonVersion = "3.12"
+pythonPlatform = "Linux"
+# Add project root to paths so `from lib.color import color` resolves
+extraPaths = ["."]
+venvPath = "."
+venv = "venv"
+typeCheckingMode = "basic"
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TorDDoS Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glass-container">
+        <header>
+            <div class="title-wrap">
+                <h1>TorDDoS</h1>
+                <span class="badge">v2.0</span>
+            </div>
+            <p class="subtitle">Distributed Denial of Service via Tor Exit Nodes</p>
+        </header>
+
+        <div class="main-content">
+            <div class="panel controls-panel">
+                <h2>Control Panel</h2>
+                
+                <div class="input-group">
+                    <label for="apiKey">API Key (if required)</label>
+                    <input type="password" id="apiKey" placeholder="Enter API Key">
+                </div>
+
+                <div class="input-group">
+                    <label for="targetUrl">Target URL</label>
+                    <input type="url" id="targetUrl" placeholder="http://example.com" required>
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label for="attempts">Attempts</label>
+                        <input type="number" id="attempts" value="50" min="1">
+                    </div>
+                    <div class="input-group">
+                        <label for="threads">Threads</label>
+                        <input type="number" id="threads" value="5" min="1">
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button id="btnStart" class="btn primary">Start Attack</button>
+                    <button id="btnStop" class="btn danger" disabled>Stop Attack</button>
+                </div>
+
+                <div class="status-card">
+                    <h3>Status: <span id="statusText" class="status-idle">Idle</span></h3>
+                    <div class="status-details">
+                        <p><strong>Tor:</strong> <span id="torStatus">Checking...</span></p>
+                        <p><strong>Target:</strong> <span id="statusTarget">-</span></p>
+                        <p><strong>Started:</strong> <span id="statusStarted">-</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel console-panel">
+                <div class="console-header">
+                    <span>Live Logs</span>
+                    <div class="dots">
+                        <i></i><i></i><i></i>
+                    </div>
+                </div>
+                <div class="console-window" id="consoleOutput">
+                    <div class="log-line text-muted">Waiting for attack to start...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

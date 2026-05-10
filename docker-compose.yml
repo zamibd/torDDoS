@@ -1,0 +1,15 @@
+services:
+  torddos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: torddos-api
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    environment:
+      - PORT=8080
+      - TORDDOS_DIR=/app
+      # Uncomment and set these for production:
+      - API_KEY=1234
+      # - ALLOWED_ORIGINS=https://dashboard.yourdomain.com
