@@ -96,8 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start Server-Sent Events for logs
     const startLogStream = () => {
         if (eventSource) eventSource.close();
-        
-        eventSource = new EventSource('/api/attack/logs');
+
+        // EventSource cannot send custom headers — pass API key as ?token= query param
+        const key = inputApiKey.value.trim();
+        const sseUrl = key ? `/api/attack/logs?token=${encodeURIComponent(key)}` : '/api/attack/logs';
+        eventSource = new EventSource(sseUrl);
         
         eventSource.onmessage = (e) => {
             let type = '';
